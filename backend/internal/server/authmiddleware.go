@@ -71,6 +71,15 @@ func caAuthMiddleware(logger zerolog.Logger, caClient *ca.CAClient) gin.HandlerF
 			return
 		}
 
+		deviceID := c.Param("deviceId")
+
+		if deviceID != cert.Subject.CommonName {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "not authorized to access this device",
+			})
+			return
+		}
+
 		c.Set("auth-id", cert.Subject.CommonName)
 		c.Set("auth-type", "certificate")
 		c.Next()

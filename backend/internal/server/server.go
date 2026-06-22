@@ -64,7 +64,7 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 	}
 
 	noAuthGroup.POST("/devices/:deviceId/certificate", server.generateDeviceCertificate)
-	caAuthGroup.GET("/devices/:deviceId/certificate/verify", server.verifyDeviceAuthHandler)
+	caAuthGroup.GET("/devices/:deviceId/certificate/verify", health)
 	adminAuthGroup.POST("/devices", server.newDeviceHandler)
 
 	return server

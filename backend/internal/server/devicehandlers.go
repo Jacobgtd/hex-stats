@@ -129,31 +129,3 @@ func (s *Server) generateDeviceCertificate(ctx *gin.Context) {
 	})
 
 }
-
-// verifyDeviceAuthHandler verifies that the authenticated device ID matches the requested device ID from the URL path
-func (s *Server) verifyDeviceAuthHandler(c *gin.Context) {
-	// Get auth ID from context (set by previous middleware)
-	authID, exists := c.Get("auth-id")
-	if !exists {
-		s.logger.Warn().Msg("auth-id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "unauthorized",
-		})
-		return
-	}
-
-	// Get device ID from URL path
-	deviceID := c.Param("deviceId")
-
-	// Verify auth ID matches device ID
-	if authID != deviceID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "not authorized to access this device",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status": "ok",
-	})
-}
