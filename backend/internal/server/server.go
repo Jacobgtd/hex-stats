@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/Jacobgtd/hex-stats/backend/internal/ca"
+	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
-	"github.com/Jacobgtd/hex-stats/backend/internal/handlers"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
@@ -15,6 +15,7 @@ import (
 type ServerClients struct {
 	GithubClient *github.GithubClient
 	CAClient     *ca.CAClient
+	DBClient     *db.DBClient
 }
 
 type Server struct {
@@ -47,22 +48,26 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 	e.Use(loggerMiddleware(logger))
 	e.Use(recoveryMiddleware(logger))
 
-	e.GET("/health", handlers.Health)
+	e.GET("/health", health)
 
-	caGroup := e.Group("/api/v1/ca")
-	caGroup.Use(adminAuthMiddleware(logger, clients.GithubClient))
-	caGroup.POST("/certificates", clients.CAClient.GenerateCert)
+	caAuthGroup := e.Group("/api/v1")
+	caAuthGroup.Use(caAuthMiddleware(logger, clients.CAClient))
+	adminAuthGroup := e.Group("/api/v1")
+	adminAuthGroup.Use(adminAuthMiddleware(logger, clients.GithubClient))
+	noAuthGroup := e.Group("/api/v1")
 
-	apiGroup := e.Group("/api/v1")
-	apiGroup.Use(caAuthMiddleware(logger, clients.CAClient))
-	apiGroup.GET("/certificates/verify", handlers.Health)
-
-	return &Server{
+	server := &Server{
 		logger:  logger,
 		engine:  e,
 		config:  config,
 		clients: clients,
 	}
+
+	noAuthGroup.POST("/devices/:deviceId/certificate", server.generateDeviceCertificate)
+	caAuthGroup.GET("/devices/:deviceId/certificate/verify", server.verifyDeviceAuthHandler)
+	adminAuthGroup.POST("/devices", server.newDeviceHandler)
+
+	return server
 }
 
 func (s *Server) Run() error {

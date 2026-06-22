@@ -2,14 +2,17 @@ package ca
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"log"
 	"math/big"
+	"net/http"
 	"time"
 
+	"github.com/Jacobgtd/hex-stats/backend/internal/common"
 	"github.com/rs/zerolog"
 )
 
@@ -25,28 +28,38 @@ func NewCAClient(logger zerolog.Logger, config *CAConfig) *CAClient {
 	}
 }
 
-func (c *CAClient) GenerateCertificate(commonName string) ([]byte, []byte, error) {
-	// gen pk
-	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, err
+func (c *CAClient) GenerateCertificate(csr *x509.CertificateRequest, deviceId int) ([]byte, *common.StatusError) {
+
+	if err := csr.CheckSignature(); err != nil {
+		c.logger.Error().Err(err).Str("subject", csr.Subject.CommonName).Msg("invalid CSR signature")
+		return nil, &common.StatusError{
+			Code:  http.StatusBadRequest,
+			Error: errors.New("Invalid CSR Signature"),
+		}
+	}
+
+	log.Println(csr.Subject.CommonName)
+
+	if csr.Subject.CommonName != fmt.Sprintf("device-%d", deviceId) {
+		c.logger.Error().Int("deviceId", deviceId).Str("common_name", csr.Subject.CommonName).Msg("CSR common name does not match expected format")
+		return nil, &common.StatusError{
+			Code:  http.StatusBadRequest,
+			Error: errors.New("CSR Common Name must be in format 'device-{id}'"),
+		}
 	}
 
 	//crt template
-	serial, err := rand.Int(rand.Reader, big.NewInt(1<<62))
-	if err != nil {
-		return nil, nil, err
-	}
+	serial := big.NewInt(time.Now().UnixNano())
 
 	template := x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
-			CommonName: commonName,
+			CommonName: csr.Subject.CommonName,
 		},
 		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(365 * 24 * time.Hour),
+		NotAfter:  time.Now().Add(24 * time.Hour),
 
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
@@ -56,11 +69,14 @@ func (c *CAClient) GenerateCertificate(commonName string) ([]byte, []byte, error
 		rand.Reader,
 		&template,
 		c.config.crt,
-		&clientKey.PublicKey,
+		csr.PublicKey,
 		c.config.key,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, &common.StatusError{
+			Code:  http.StatusInternalServerError,
+			Error: errors.New("Failed to create certificate"),
+		}
 	}
 
 	// 4. Encode CERT to PEM bytes
@@ -69,13 +85,7 @@ func (c *CAClient) GenerateCertificate(commonName string) ([]byte, []byte, error
 		Bytes: derBytes,
 	})
 
-	// 5. Encode KEY to PEM bytes
-	keyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(clientKey),
-	})
-
-	return certPEM, keyPEM, nil
+	return certPEM, nil
 }
 
 func (c *CAClient) VerifyCertificate(cert *x509.Certificate) error {

@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/Jacobgtd/hex-stats/backend/internal/ca"
+	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
 	"github.com/Jacobgtd/hex-stats/backend/internal/server"
 	"github.com/rs/zerolog"
@@ -26,6 +27,17 @@ func main() {
 
 	ghClient := github.NewGithubClient(logger, ghConfig)
 
+	// Initialize DBClient
+	dbConfig, err := db.LoadDBConfig()
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to load DB config")
+	}
+
+	dbClient, err := db.NewDBClient(logger, dbConfig)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to initialize DB client")
+	}
+
 	//Initialize CAClient
 	caConfig, err := ca.LoadCAConfig()
 	if err != nil {
@@ -37,6 +49,7 @@ func main() {
 	clients := &server.ServerClients{
 		GithubClient: ghClient,
 		CAClient:     caClient,
+		DBClient:     dbClient,
 	}
 
 	srv := server.NewServer(logger, config, clients)

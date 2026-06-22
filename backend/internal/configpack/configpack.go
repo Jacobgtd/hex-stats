@@ -95,6 +95,38 @@ func IntOrDefault(key string, defaultValue int) int {
 	return intValue
 }
 
+// Bool returns the value of the environment variable key as a boolean.
+// Returns an error if the variable is not found or cannot be parsed as a boolean.
+func Bool(key string) (bool, error) {
+	value, err := String(key)
+	if err != nil {
+		return false, err
+	}
+
+	boolValue, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse environment variable %s as bool: %w", key, err)
+	}
+
+	return boolValue, nil
+}
+
+// BoolOrDefault returns the value of the environment variable key as a boolean,
+// or defaultValue if not found or cannot be parsed as a boolean.
+func BoolOrDefault(key string, defaultValue bool) bool {
+	value, err := String(key)
+	if err != nil {
+		return defaultValue
+	}
+
+	boolValue, err := strconv.ParseBool(value)
+	if err != nil {
+		return defaultValue
+	}
+
+	return boolValue
+}
+
 // LoadFile loads the contents of a file from the secrets directory into a string.
 // Returns an error if the file cannot be read.
 func LoadFile(filename string) (string, error) {
