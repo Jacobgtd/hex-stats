@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"net/http"
 	"strconv"
-
 	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
+	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
@@ -14,6 +14,7 @@ import (
 type ServerClients struct {
 	GithubClient *github.GithubClient
 	AuthnClient  *authn.AuthnClient
+	DBClient     *db.DBClient
 }
 
 type Server struct {
@@ -46,6 +47,7 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 	e.Use(loggerMiddleware(logger))
 	e.Use(recoveryMiddleware(logger))
 
+
 	e.GET("/health", Health)
 
 	apiGroup := e.Group("/api/v1")
@@ -54,11 +56,15 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 	authGroup.POST("/github")
 
 	return &Server{
+
+	server := &Server{
 		logger:  logger,
 		engine:  e,
 		config:  config,
 		clients: clients,
 	}
+
+	return server
 }
 
 func (s *Server) Run() error {
