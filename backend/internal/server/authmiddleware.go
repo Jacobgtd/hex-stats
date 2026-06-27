@@ -1,17 +1,6 @@
 package server
 
-import (
-	"context"
-	"net/http"
-	"strings"
-	"time"
-
-	"github.com/Jacobgtd/hex-stats/backend/internal/ca"
-	"github.com/Jacobgtd/hex-stats/backend/internal/github"
-	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog"
-)
-
+/*
 func adminAuthMiddleware(logger zerolog.Logger, githubClient *github.GithubClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -76,3 +65,4 @@ func caAuthMiddleware(logger zerolog.Logger, caClient *ca.CAClient) gin.HandlerF
 		c.Next()
 	}
 }
+*/

@@ -5,16 +5,15 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Jacobgtd/hex-stats/backend/internal/ca"
+	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
-	"github.com/Jacobgtd/hex-stats/backend/internal/handlers"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
 
 type ServerClients struct {
 	GithubClient *github.GithubClient
-	CAClient     *ca.CAClient
+	AuthnClient  *authn.AuthnClient
 }
 
 type Server struct {
@@ -47,15 +46,12 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 	e.Use(loggerMiddleware(logger))
 	e.Use(recoveryMiddleware(logger))
 
-	e.GET("/health", handlers.Health)
-
-	caGroup := e.Group("/api/v1/ca")
-	caGroup.Use(adminAuthMiddleware(logger, clients.GithubClient))
-	caGroup.POST("/certificates", clients.CAClient.GenerateCert)
+	e.GET("/health", Health)
 
 	apiGroup := e.Group("/api/v1")
-	apiGroup.Use(caAuthMiddleware(logger, clients.CAClient))
-	apiGroup.GET("/certificates/verify", handlers.Health)
+
+	authGroup := apiGroup.Group("/auth")
+	authGroup.POST("/github")
 
 	return &Server{
 		logger:  logger,
