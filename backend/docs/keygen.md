@@ -1,0 +1,2 @@
+& "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" genpkey -algorithm RSA -out private.pem -pkeyopt rsa_keygen_bits:2048
+& "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" rsa -pubout -in private.pem -out public.pem

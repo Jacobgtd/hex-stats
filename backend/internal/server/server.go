@@ -4,8 +4,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	"strconv"
-
-	"github.com/Jacobgtd/hex-stats/backend/internal/ca"
+	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
 	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
 	"github.com/gin-gonic/gin"
@@ -14,7 +13,7 @@ import (
 
 type ServerClients struct {
 	GithubClient *github.GithubClient
-	CAClient     *ca.CAClient
+	AuthnClient  *authn.AuthnClient
 	DBClient     *db.DBClient
 }
 
@@ -48,13 +47,15 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 	e.Use(loggerMiddleware(logger))
 	e.Use(recoveryMiddleware(logger))
 
-	e.GET("/health", health)
 
-	caAuthGroup := e.Group("/api/v1")
-	caAuthGroup.Use(caAuthMiddleware(logger, clients.CAClient))
-	adminAuthGroup := e.Group("/api/v1")
-	adminAuthGroup.Use(adminAuthMiddleware(logger, clients.GithubClient))
-	noAuthGroup := e.Group("/api/v1")
+	e.GET("/health", Health)
+
+	apiGroup := e.Group("/api/v1")
+
+	authGroup := apiGroup.Group("/auth")
+	authGroup.POST("/github")
+
+	return &Server{
 
 	server := &Server{
 		logger:  logger,
@@ -62,10 +63,6 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 		config:  config,
 		clients: clients,
 	}
-
-	noAuthGroup.POST("/devices/:deviceId/certificate", server.generateDeviceCertificate)
-	caAuthGroup.GET("/devices/:deviceId/certificate/verify", health)
-	adminAuthGroup.POST("/devices", server.newDeviceHandler)
 
 	return server
 }

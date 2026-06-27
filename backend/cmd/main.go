@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/Jacobgtd/hex-stats/backend/internal/ca"
+	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
 	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
 	"github.com/Jacobgtd/hex-stats/backend/internal/server"
@@ -27,6 +27,15 @@ func main() {
 
 	ghClient := github.NewGithubClient(logger, ghConfig)
 
+	authnConfig, err := authn.LoadAuthnConfig()
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to load authn config")
+	}
+	authnClient := authn.NewAuthnClient(logger, authnConfig)
+
+	clients := &server.ServerClients{
+		GithubClient: ghClient,
+		AuthnClient:  authnClient,
 	// Initialize DBClient
 	dbConfig, err := db.LoadDBConfig()
 	if err != nil {
@@ -38,17 +47,10 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to initialize DB client")
 	}
 
-	//Initialize CAClient
-	caConfig, err := ca.LoadCAConfig()
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to load CA config")
-	}
-
-	caClient := ca.NewCAClient(logger, caConfig)
 
 	clients := &server.ServerClients{
 		GithubClient: ghClient,
-		CAClient:     caClient,
+		AuthnClient:  authnClient,
 		DBClient:     dbClient,
 	}
 
