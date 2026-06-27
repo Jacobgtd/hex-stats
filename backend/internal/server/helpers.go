@@ -2,12 +2,13 @@ package server
 
 import (
 	"crypto/rand"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
+	"github.com/gin-gonic/gin"
 )
 
 func newSecret() (string, error) {
@@ -22,33 +23,39 @@ func newSecret() (string, error) {
 	return secret, nil
 }
 
-func parseCSR(pemCSR string) (*x509.CertificateRequest, error) {
-	block, _ := pem.Decode([]byte(pemCSR))
-	if block == nil {
-		return nil, fmt.Errorf("invalid PEM")
+func parseBearerToken(c *gin.Context) (string, error) {
+	authHeader := c.GetHeader("Authorization")
+
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", fmt.Errorf("invalid authorization format")
 	}
-	return x509.ParseCertificateRequest(block.Bytes)
+
+	token := strings.TrimSpace(parts[1])
+	if token == "" {
+		return "", fmt.Errorf("token cannot be empty")
+	}
+	return token, nil
 }
 
-// parseDeviceID extracts the numeric ID from a device identifier like "device-12"
-func parseDeviceID(deviceID string) (int, error) {
-	parts := strings.Split(deviceID, "-")
-	if len(parts) != 2 {
-		return 0, fmt.Errorf("invalid device ID format: expected 'device-<id>', got '%s'", deviceID)
+func getUser(c *gin.Context) (*authn.User, error) {
+	user, ok := c.Get("user")
+	if !ok {
+		return nil, fmt.Errorf("could not get user")
 	}
 
-	if parts[0] != "device" {
-		return 0, fmt.Errorf("invalid device ID format: expected prefix 'device', got '%s'", parts[0])
+	u, ok := user.(*authn.User)
+	if !ok {
+		return nil, fmt.Errorf("could not get user")
 	}
+	return u, nil
+}
 
-	id, err := strconv.Atoi(parts[1])
+func getIdFromPath(c *gin.Context) (uint, error) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		return 0, fmt.Errorf("invalid device ID: '%s' is not a valid number", parts[1])
+		return 0, err
 	}
-
-	if id <= 0 {
-		return 0, fmt.Errorf("invalid device ID: must be positive, got %d", id)
-	}
-
-	return id, nil
+	return uint(id), nil
 }

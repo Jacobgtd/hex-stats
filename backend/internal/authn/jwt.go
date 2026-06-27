@@ -1,6 +1,7 @@
 package authn
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -39,4 +40,29 @@ func (c *AuthnClient) GenerateToken(user User) (string, error) {
 
 	return tokenStr, nil
 
+}
+
+func (c *AuthnClient) DecipherToken(tokenStr string) (*User, error) {
+
+	claims := jwtClaims{}
+	token, err := jwt.ParseWithClaims(
+		tokenStr,
+		&claims,
+		func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+
+			return c.config.PublicKey, nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	return &claims.User, nil
 }

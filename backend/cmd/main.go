@@ -27,15 +27,13 @@ func main() {
 
 	ghClient := github.NewGithubClient(logger, ghConfig)
 
+	// Initialize AuthClient
 	authnConfig, err := authn.LoadAuthnConfig()
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to load authn config")
 	}
 	authnClient := authn.NewAuthnClient(logger, authnConfig)
 
-	clients := &server.ServerClients{
-		GithubClient: ghClient,
-		AuthnClient:  authnClient,
 	// Initialize DBClient
 	dbConfig, err := db.LoadDBConfig()
 	if err != nil {
@@ -46,7 +44,6 @@ func main() {
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to initialize DB client")
 	}
-
 
 	clients := &server.ServerClients{
 		GithubClient: ghClient,

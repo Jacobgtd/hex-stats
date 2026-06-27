@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	"strconv"
+
 	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
 	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
@@ -47,22 +48,21 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 	e.Use(loggerMiddleware(logger))
 	e.Use(recoveryMiddleware(logger))
 
-
-	e.GET("/health", Health)
-
-	apiGroup := e.Group("/api/v1")
-
-	authGroup := apiGroup.Group("/auth")
-	authGroup.POST("/github")
-
-	return &Server{
-
 	server := &Server{
 		logger:  logger,
 		engine:  e,
 		config:  config,
 		clients: clients,
 	}
+
+	e.GET("/health", Health)
+
+	apiGroup := e.Group("/api/v1")
+
+	apiGroup.POST("/auth/github", server.authGithub)
+	apiGroup.POST("/auth/device", server.authDevice)
+	apiGroup.GET("/auth", server.authMiddleware(logger, authn.PermissionsDefault), server.checkAuth)
+	apiGroup.POST("/device", server.authMiddleware(logger, authn.PermissionsAdmin), server.newDeviceHandler)
 
 	return server
 }
@@ -74,8 +74,7 @@ func (s *Server) Run() error {
 		Addr:    ":" + strconv.Itoa(int(s.config.port)),
 		Handler: s.engine,
 		TLSConfig: &tls.Config{
-			ClientAuth: tls.RequestClientCert,
-			ClientCAs:  nil,
+			MinVersion: tls.VersionTLS13,
 		},
 	}
 	return srv.ListenAndServeTLS(s.config.crtPath, s.config.keyPath)

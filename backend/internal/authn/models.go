@@ -22,6 +22,17 @@ type User struct {
 	Permissions Permissions `json:"permissions"`
 }
 
+func (u *User) IsAuthorized(p Permissions) bool {
+	switch u.Permissions {
+	case PermissionsAdmin:
+		return true
+	case PermissionsDefault:
+		return p != PermissionsAdmin
+	default:
+		return false
+	}
+}
+
 type jwtClaims struct {
 	User
 	jwt.RegisteredClaims
