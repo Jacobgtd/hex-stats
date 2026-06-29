@@ -2,11 +2,11 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"time"
 
+	"github.com/Jacobgtd/hex-stats/backend/interal/monitoring"
 	"github.com/Jacobgtd/hex-stats/backend/internal/common"
 
 	"github.com/rs/zerolog"
@@ -33,37 +33,14 @@ func NewGithubClient(logger zerolog.Logger, config *GithubClientConfig) *GithubC
 func (g *GithubClient) IsAdmin(ctx context.Context, ghtoken string) (string, *common.StatusError) {
 	g.logger.Debug().Msg("checking if GitHub user is admin")
 
-	// Create request to GitHub API
-	req, err := http.NewRequestWithContext(ctx, "GET", g.config.Url+"/user", nil)
-	if err != nil {
-		g.logger.Error().Err(err).Msg("failed to create GitHub API request")
-		return "", &common.StatusError{Code: http.StatusInternalServerError, Error: err}
-	}
-
-	// Add bearer token header
-	req.Header.Set("Authorization", "Bearer "+ghtoken)
-
-	// Make request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		g.logger.Error().Err(err).Msg("failed to fetch GitHub user")
-		return "", &common.StatusError{Code: http.StatusInternalServerError, Error: err}
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		err := fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode, string(body))
-		g.logger.Error().Err(err).Int("status", resp.StatusCode).Msg("GitHub API error")
-		return "", &common.StatusError{Code: resp.StatusCode, Error: err}
-	}
-
-	// Parse response
 	var user GithubUser
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-		g.logger.Error().Err(err).Msg("failed to parse GitHub user response")
-		return "", &common.StatusError{Code: http.StatusInternalServerError, Error: err}
+	request := monitoring.NewHttpRequest(g.config.Url, "user", http.MethodGet)
+	statusCode, err := request.WithCtx(ctx).WithBearerToken(ghtoken).WithTimeout(time.Second * 5).WithExpectedFailureCode().Do(&user)
+	if err != nil {
+		return "", &common.StatusError{
+			Code:  statusCode,
+			Error: err,
+		}
 	}
 
 	g.logger.Debug().Str("login", user.Login).Msg("fetched GitHub user")

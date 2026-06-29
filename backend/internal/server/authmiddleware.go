@@ -3,12 +3,12 @@ package server
 import (
 	"net/http"
 
-	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
+	"github.com/Jacobgtd/hex-stats/backend/internal/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
 
-func (s *Server) authMiddleware(log zerolog.Logger, permissions authn.Permissions) gin.HandlerFunc {
+func (s *Server) authMiddleware(log zerolog.Logger, permissions auth.Permissions) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := parseBearerToken(c)
 		if err != nil {
@@ -18,7 +18,7 @@ func (s *Server) authMiddleware(log zerolog.Logger, permissions authn.Permission
 			return
 		}
 
-		user, err := s.clients.AuthnClient.DecipherToken(token)
+		user, err := s.clients.AuthClient.DecipherToken(token)
 		if err != nil {
 			c.AbortWithStatusJSON(
 				http.StatusUnauthorized, gin.H{

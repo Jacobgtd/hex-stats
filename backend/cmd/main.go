@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
+	"github.com/Jacobgtd/hex-stats/backend/internal/auth"
 	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
 	"github.com/Jacobgtd/hex-stats/backend/internal/server"
@@ -28,11 +28,11 @@ func main() {
 	ghClient := github.NewGithubClient(logger, ghConfig)
 
 	// Initialize AuthClient
-	authnConfig, err := authn.LoadAuthnConfig()
+	authConfig, err := auth.LoadAuthConfig()
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to load authn config")
+		logger.Fatal().Err(err).Msg("failed to load auth config")
 	}
-	authnClient := authn.NewAuthnClient(logger, authnConfig)
+	authClient := auth.NewAuthClient(logger, authConfig)
 
 	// Initialize DBClient
 	dbConfig, err := db.LoadDBConfig()
@@ -47,7 +47,7 @@ func main() {
 
 	clients := &server.ServerClients{
 		GithubClient: ghClient,
-		AuthnClient:  authnClient,
+		AuthClient:   authClient,
 		DBClient:     dbClient,
 	}
 

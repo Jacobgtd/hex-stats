@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
+	"github.com/Jacobgtd/hex-stats/backend/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -36,10 +36,10 @@ func (s *Server) authGithub(c *gin.Context) {
 		return
 	}
 
-	token, err := s.clients.AuthnClient.GenerateToken(authn.User{
-		Type:        authn.UserHuman,
+	token, err := s.clients.AuthClient.GenerateToken(auth.User{
+		Type:        auth.UserHuman,
 		Id:          user,
-		Permissions: authn.PermissionsAdmin,
+		Permissions: auth.PermissionsAdmin,
 	})
 	if err != nil {
 		c.JSON(
@@ -103,10 +103,10 @@ func (s *Server) authDevice(c *gin.Context) {
 		return
 	}
 
-	token, err := s.clients.AuthnClient.GenerateToken(authn.User{
-		Type:        authn.UserDevice,
+	token, err := s.clients.AuthClient.GenerateToken(auth.User{
+		Type:        auth.UserDevice,
 		Id:          strconv.Itoa(device.ID),
-		Permissions: authn.PermissionsDefault,
+		Permissions: auth.PermissionsDefault,
 	})
 	if err != nil {
 		c.JSON(

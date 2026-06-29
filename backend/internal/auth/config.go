@@ -1,4 +1,4 @@
-package authn
+package auth
 
 import (
 	"crypto/rsa"
@@ -8,14 +8,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type AuthnClientConfig struct {
+type AuthClientConfig struct {
 	ExpiryTime time.Duration
 	ApiName    string
 	PrivateKey *rsa.PrivateKey
 	PublicKey  *rsa.PublicKey
 }
 
-func LoadAuthnConfig() (*AuthnClientConfig, error) {
+func LoadAuthConfig() (*AuthClientConfig, error) {
 	err := configpack.Load("jwt.config")
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func LoadAuthnConfig() (*AuthnClientConfig, error) {
 		return nil, err
 	}
 
-	return &AuthnClientConfig{
+	return &AuthClientConfig{
 		ExpiryTime: time.Second * time.Duration(expiryTimeInt),
 		ApiName:    apiName,
 		PrivateKey: privateKey,

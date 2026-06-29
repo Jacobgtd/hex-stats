@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
+	"github.com/Jacobgtd/hex-stats/backend/internal/auth"
 	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
 	"github.com/gin-gonic/gin"
@@ -14,7 +14,7 @@ import (
 
 type ServerClients struct {
 	GithubClient *github.GithubClient
-	AuthnClient  *authn.AuthnClient
+	AuthClient   *auth.AuthClient
 	DBClient     *db.DBClient
 }
 
@@ -61,8 +61,8 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 
 	apiGroup.POST("/auth/github", server.authGithub)
 	apiGroup.POST("/auth/device", server.authDevice)
-	apiGroup.GET("/auth", server.authMiddleware(logger, authn.PermissionsDefault), server.checkAuth)
-	apiGroup.POST("/device", server.authMiddleware(logger, authn.PermissionsAdmin), server.newDeviceHandler)
+	apiGroup.GET("/auth", server.authMiddleware(logger, auth.PermissionsDefault), server.checkAuth)
+	apiGroup.POST("/device", server.authMiddleware(logger, auth.PermissionsAdmin), server.newDeviceHandler)
 
 	return server
 }

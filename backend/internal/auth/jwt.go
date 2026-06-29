@@ -1,4 +1,4 @@
-package authn
+package auth
 
 import (
 	"fmt"
@@ -8,19 +8,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type AuthnClient struct {
-	config *AuthnClientConfig
+type AuthClient struct {
+	config *AuthClientConfig
 	logger zerolog.Logger
 }
 
-func NewAuthnClient(logger zerolog.Logger, config *AuthnClientConfig) *AuthnClient {
-	return &AuthnClient{
+func NewAuthClient(logger zerolog.Logger, config *AuthClientConfig) *AuthClient {
+	return &AuthClient{
 		logger: logger,
 		config: config,
 	}
 }
 
-func (c *AuthnClient) GenerateToken(user User) (string, error) {
+func (c *AuthClient) GenerateToken(user User) (string, error) {
 
 	now := time.Now()
 	claims := jwtClaims{
@@ -42,7 +42,7 @@ func (c *AuthnClient) GenerateToken(user User) (string, error) {
 
 }
 
-func (c *AuthnClient) DecipherToken(tokenStr string) (*User, error) {
+func (c *AuthClient) DecipherToken(tokenStr string) (*User, error) {
 
 	claims := jwtClaims{}
 	token, err := jwt.ParseWithClaims(

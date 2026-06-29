@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Jacobgtd/hex-stats/backend/internal/authn"
+	"github.com/Jacobgtd/hex-stats/backend/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,13 +38,13 @@ func parseBearerToken(c *gin.Context) (string, error) {
 	return token, nil
 }
 
-func getUser(c *gin.Context) (*authn.User, error) {
+func getUser(c *gin.Context) (*auth.User, error) {
 	user, ok := c.Get("user")
 	if !ok {
 		return nil, fmt.Errorf("could not get user")
 	}
 
-	u, ok := user.(*authn.User)
+	u, ok := user.(*auth.User)
 	if !ok {
 		return nil, fmt.Errorf("could not get user")
 	}
