@@ -112,20 +112,20 @@ type httpResult struct {
 	StatusCode int
 	Body       []byte
 }
-type HttpResponse struct {
+type HTTPResponse struct {
 	result httpResult
 }
 
-func (r *HttpResponse) StatusCode() int {
+func (r *HTTPResponse) StatusCode() int {
 	return r.result.StatusCode
 }
 
-func (r *HttpResponse) Unmarshal(res interface{}) error {
+func (r *HTTPResponse) Unmarshal(res interface{}) error {
 	err := json.Unmarshal(r.result.Body, res)
 	return err
 }
 
-func (r *HTTPRequest) Do(ctx context.Context) (*HttpResponse, error) {
+func (r *HTTPRequest) Do(ctx context.Context) (*HTTPResponse, error) {
 	// Make request
 	requestHash := r.hash()
 
@@ -143,7 +143,7 @@ func (r *HTTPRequest) Do(ctx context.Context) (*HttpResponse, error) {
 		resp := &httpResult{}
 		err := r.HTTPClient.cache.Get("http-client", requestHash, resp).Do(ctx)
 		if err == nil {
-			return &HttpResponse{result: *resp}, nil
+			return &HTTPResponse{result: *resp}, nil
 		}
 	}
 
@@ -195,7 +195,7 @@ func (r *HTTPRequest) Do(ctx context.Context) (*HttpResponse, error) {
 		}
 	}
 
-	return &HttpResponse{
+	return &HTTPResponse{
 		result: result,
 	}, nil
 }
