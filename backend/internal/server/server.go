@@ -6,23 +6,17 @@ import (
 	"strconv"
 
 	"github.com/Jacobgtd/hex-stats/backend/internal/auth"
-	"github.com/Jacobgtd/hex-stats/backend/internal/db"
-	"github.com/Jacobgtd/hex-stats/backend/internal/github"
+	"github.com/Jacobgtd/hex-stats/backend/internal/clients"
+	"github.com/Jacobgtd/hex-stats/backend/internal/metricsapi"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
-
-type ServerClients struct {
-	GithubClient *github.GithubClient
-	AuthClient   *auth.AuthClient
-	DBClient     *db.DBClient
-}
 
 type Server struct {
 	engine  *gin.Engine
 	logger  zerolog.Logger
 	config  *ServerConfig
-	clients *ServerClients
+	clients *clients.Clients
 }
 
 func recoveryMiddleware(log zerolog.Logger) gin.HandlerFunc {
@@ -42,7 +36,7 @@ func recoveryMiddleware(log zerolog.Logger) gin.HandlerFunc {
 	}
 }
 
-func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClients) *Server {
+func NewServer(logger zerolog.Logger, config *ServerConfig, clients *clients.Clients) *Server {
 
 	e := gin.New()
 	e.Use(loggerMiddleware(logger))
@@ -63,6 +57,10 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *ServerClien
 	apiGroup.POST("/auth/device", server.authDevice)
 	apiGroup.GET("/auth", server.authMiddleware(logger, auth.PermissionsDefault), server.checkAuth)
 	apiGroup.POST("/device", server.authMiddleware(logger, auth.PermissionsAdmin), server.newDeviceHandler)
+
+	metricsApiGroup := apiGroup.Group("/metrics")
+	metricsApiGroup.Use(server.authMiddleware(logger, auth.PermissionsDefault))
+	metricsapi.RegisterMetricsRoutes(metricsApiGroup, clients)
 
 	return server
 }

@@ -2,18 +2,18 @@ package noaa
 
 import "github.com/Jacobgtd/hex-stats/backend/internal/configpack"
 
-type NoaaClientConfig struct {
+type NOAAClientConfig struct {
 	Url string
 }
 
-func LoadNoaaConfig() (*NoaaClientConfig, error) {
+func LoadNOAAConfig() (*NOAAClientConfig, error) {
 	err := configpack.Load("noaa.config")
 	if err != nil {
 		return nil, err
 	}
 
 	url, err := configpack.String("URL")
-	return &NoaaClientConfig{
+	return &NOAAClientConfig{
 		Url: url,
 	}, nil
 }

@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,37 +10,48 @@ import (
 	"net/url"
 	"slices"
 	"time"
+
+	"github.com/Jacobgtd/hex-stats/backend/internal/cache"
 )
 
-type HttpRequest struct {
-	ctx                     context.Context
-	baseUrl                 string
-	path                    string
-	method                  string
-	headers                 http.Header
-	body                    interface{}
-	queryParams             url.Values
-	timeout                 *time.Duration
-	expectedSuccessCode     []int
-	expectedFailureCode     []int
-	useExpectedFailureCodes bool
+type HTTPClient struct {
+	client http.Client
+	cache  cache.Cache
 }
 
-func NewHttpRequest(baseUrl, path, method string) HttpRequest {
-	return HttpRequest{
-		baseUrl:                 baseUrl,
-		path:                    path,
-		method:                  method,
-		useExpectedFailureCodes: false,
+func NewHTTPClient(client http.Client, cache cache.Cache) *HTTPClient {
+	return &HTTPClient{
+		client: client,
+		cache:  cache,
 	}
 }
 
-func (r *HttpRequest) WithCtx(ctx context.Context) *HttpRequest {
-	r.ctx = ctx
-	return r
+type HTTPRequest struct {
+	HTTPClient            *HTTPClient
+	baseURL               string
+	path                  string
+	method                string
+	headers               http.Header
+	body                  interface{}
+	queryParams           url.Values
+	timeout               *time.Duration
+	possibleResponseCodes []int
+	useCache              bool
+	cachettl              *time.Duration
+	cacheExpiry           *time.Time
 }
 
-func (r *HttpRequest) WithHeaders(h http.Header) *HttpRequest {
+func (c *HTTPClient) NewHTTPRequest(baseUrl, path, method string) *HTTPRequest {
+	return &HTTPRequest{
+		HTTPClient: c,
+		baseURL:    baseUrl,
+		path:       path,
+		method:     method,
+		useCache:   false,
+	}
+}
+
+func (r *HTTPRequest) WithHeaders(h http.Header) *HTTPRequest {
 	if r.headers == nil {
 		r.headers = h
 		return r
@@ -54,7 +66,7 @@ func (r *HttpRequest) WithHeaders(h http.Header) *HttpRequest {
 	return r
 }
 
-func (r *HttpRequest) WithBearerToken(token string) *HttpRequest {
+func (r *HTTPRequest) WithBearerToken(token string) *HTTPRequest {
 	if r.headers == nil {
 		r.headers = http.Header{}
 	}
@@ -62,95 +74,142 @@ func (r *HttpRequest) WithBearerToken(token string) *HttpRequest {
 	return r
 }
 
-func (r *HttpRequest) WithBody(h http.Header) *HttpRequest {
+func (r *HTTPRequest) WithBody(h http.Header) *HTTPRequest {
 	r.headers = h
 	return r
 }
 
-func (r *HttpRequest) WithQueryParams(p url.Values) *HttpRequest {
+func (r *HTTPRequest) WithCacheTTL(ttl time.Duration) *HTTPRequest {
+	r.useCache = true
+	r.cachettl = &ttl
+	return r
+}
+
+func (r *HTTPRequest) WithCacheExpiry(expiry time.Time) *HTTPRequest {
+	r.useCache = true
+	r.cacheExpiry = &expiry
+	return r
+}
+
+func (r *HTTPRequest) WithQueryParams(p url.Values) *HTTPRequest {
 	r.queryParams = p
 	return r
 }
 
-func (r *HttpRequest) WithTimeout(t time.Duration) *HttpRequest {
+func (r *HTTPRequest) WithTimeout(t time.Duration) *HTTPRequest {
 	var timeout time.Duration
 	timeout = t
 	r.timeout = &timeout
 	return r
 }
 
-func (r *HttpRequest) WithExpectedSuccessCode(codes ...int) *HttpRequest {
-	r.expectedSuccessCode = append(r.expectedSuccessCode, codes...)
+func (r *HTTPRequest) WithPossibleResponseCodes(codes ...int) *HTTPRequest {
+	r.possibleResponseCodes = append(r.possibleResponseCodes, codes...)
 	return r
 }
 
-func (r *HttpRequest) WithExpectedFailureCode(codes ...int) *HttpRequest {
-	r.expectedFailureCode = append(r.expectedFailureCode, codes...)
-	r.useExpectedFailureCodes = true
-	return r
+type httpResult struct {
+	StatusCode int
+	Body       []byte
+}
+type HttpResponse struct {
+	result httpResult
 }
 
-func (r *HttpRequest) Do(res interface{}) (int, error) {
+func (r *HttpResponse) StatusCode() int {
+	return r.result.StatusCode
+}
+
+func (r *HttpResponse) Unmarshal(res interface{}) error {
+	err := json.Unmarshal(r.result.Body, res)
+	return err
+}
+
+func (r *HTTPRequest) Do(ctx context.Context) (*HttpResponse, error) {
 	// Make request
+	requestHash := r.hash()
 
-	if r.ctx == nil {
-		newCtx := context.Background()
-		r.ctx = newCtx
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
 	if r.timeout != nil {
-		newCtx, cancel := context.WithTimeout(r.ctx, *r.timeout)
+		newCtx, cancel := context.WithTimeout(ctx, *r.timeout)
 		defer cancel()
-		r.ctx = newCtx
+		ctx = newCtx
 	}
 
-	url := fmt.Sprintf("%s/%s", r.baseUrl, r.path)
+	if r.useCache {
+		resp := &httpResult{}
+		err := r.HTTPClient.cache.Get("http-client", requestHash, resp).Do(ctx)
+		if err == nil {
+			return &HttpResponse{result: *resp}, nil
+		}
+	}
+
+	url := fmt.Sprintf("%s/%s", r.baseURL, r.path)
 	if r.queryParams != nil {
 		url = fmt.Sprintf("%s?%s", url, r.queryParams.Encode())
 	}
 
-	req, err := http.NewRequestWithContext(r.ctx, r.method, fmt.Sprintf("%s/%s", r.baseUrl, r.path), nil)
+	req, err := http.NewRequestWithContext(ctx, r.method, url, nil)
 	req.Header = r.headers
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return nil, err
 	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if r.expectedSuccessCode == nil {
-		r.expectedSuccessCode = []int{http.StatusOK}
-	}
-	responseCodeIsSuccess := slices.Contains(r.expectedSuccessCode, resp.StatusCode)
-
-	responseCodeIsFailure := !responseCodeIsSuccess
-	if r.useExpectedFailureCodes {
-		responseCodeIsFailure = slices.Contains(r.expectedFailureCode, resp.StatusCode)
+	if r.possibleResponseCodes == nil {
+		r.possibleResponseCodes = []int{http.StatusOK}
 	}
 
-	if !responseCodeIsSuccess && !responseCodeIsFailure {
-		return http.StatusInternalServerError, fmt.Errorf("unexpected response code %d", resp.StatusCode)
+	if !slices.Contains(r.possibleResponseCodes, resp.StatusCode) {
+		return nil, fmt.Errorf("unexpected response code %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return nil, err
 	}
 
-	if responseCodeIsFailure {
-		return resp.StatusCode, nil
+	result := httpResult{
+		StatusCode: resp.StatusCode,
+		Body:       body,
 	}
 
-	if res != nil {
-		err = json.Unmarshal(body, res)
+	if r.useCache {
+		var err error
+		if r.cacheExpiry != nil {
+			err = r.HTTPClient.cache.Set("http-client", requestHash, result).WithExpiry(*r.cacheExpiry).Do(ctx)
+		} else {
+			err = r.HTTPClient.cache.Set("http-client", requestHash, result).WithTTL(*r.cachettl).Do(ctx)
+		}
 		if err != nil {
-			return http.StatusInternalServerError, err
+			// Log the error but don't fail the request
 		}
 	}
 
-	return resp.StatusCode, nil
+	return &HttpResponse{
+		result: result,
+	}, nil
+}
+
+func (r *HTTPRequest) hash() string {
+	hash := hashObjects(r.baseURL, r.path, r.method, r.queryParams, r.headers, r.body)
+	return fmt.Sprintf("%x", hash)
+}
+
+func hashObjects(objects ...any) [32]byte {
+	data, err := json.Marshal(objects)
+	if err != nil {
+		panic(err)
+	}
+
+	return sha256.Sum256(data)
 }

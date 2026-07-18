@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Jacobgtd/hex-stats/backend/interal/monitoring"
 	"github.com/Jacobgtd/hex-stats/backend/internal/common"
+	"github.com/Jacobgtd/hex-stats/backend/internal/monitoring"
 
 	"github.com/rs/zerolog"
 )
@@ -17,14 +17,16 @@ type GithubUser struct {
 }
 
 type GithubClient struct {
-	logger zerolog.Logger
-	config *GithubClientConfig
+	logger     zerolog.Logger
+	config     *GithubClientConfig
+	httpClient *monitoring.HTTPClient
 }
 
-func NewGithubClient(logger zerolog.Logger, config *GithubClientConfig) *GithubClient {
+func NewGithubClient(logger zerolog.Logger, config *GithubClientConfig, httpClient *monitoring.HTTPClient) *GithubClient {
 	return &GithubClient{
-		config: config,
-		logger: logger,
+		config:     config,
+		logger:     logger,
+		httpClient: httpClient,
 	}
 }
 
@@ -34,12 +36,23 @@ func (g *GithubClient) IsAdmin(ctx context.Context, ghtoken string) (string, *co
 	g.logger.Debug().Msg("checking if GitHub user is admin")
 
 	var user GithubUser
-	request := monitoring.NewHttpRequest(g.config.Url, "user", http.MethodGet)
-	statusCode, err := request.WithCtx(ctx).WithBearerToken(ghtoken).WithTimeout(time.Second * 5).WithExpectedFailureCode().Do(&user)
+	resp, err := g.httpClient.NewHTTPRequest(g.config.Url, "user", http.MethodGet).
+		WithBearerToken(ghtoken).
+		WithTimeout(5*time.Second).
+		WithPossibleResponseCodes(http.StatusOK, http.StatusUnauthorized, http.StatusForbidden).
+		Do(ctx)
+
 	if err != nil {
 		return "", &common.StatusError{
-			Code:  statusCode,
+			Code:  http.StatusFailedDependency,
 			Error: err,
+		}
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return "", &common.StatusError{
+			Code:  http.StatusUnauthorized,
+			Error: fmt.Errorf("unauthorized"),
 		}
 	}
 
