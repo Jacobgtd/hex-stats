@@ -1,4 +1,4 @@
 dump/
 **/secrets/
 __debug*
-cache
+cache-dump
