@@ -37,7 +37,7 @@ func Load(filename string) error {
 	filePath := filepath.Join(secretsDir, filename)
 
 	// Load the file and overwrite existing env vars
-	if err := godotenv.Load(filePath); err != nil {
+	if err := godotenv.Overload(filePath); err != nil {
 		return fmt.Errorf("failed to load env file %s: %w", filePath, err)
 	}
 

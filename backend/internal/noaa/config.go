@@ -6,7 +6,7 @@ type NOAAClientConfig struct {
 	Url string
 }
 
-func LoadNOAAConfig() (*NOAAClientConfig, error) {
+func LoadNOAAClientConfig() (*NOAAClientConfig, error) {
 	err := configpack.Load("noaa.config")
 	if err != nil {
 		return nil, err

@@ -7,7 +7,7 @@ import (
 
 	"github.com/Jacobgtd/hex-stats/backend/internal/auth"
 	"github.com/Jacobgtd/hex-stats/backend/internal/clients"
-	"github.com/Jacobgtd/hex-stats/backend/internal/metricsapi"
+	"github.com/Jacobgtd/hex-stats/backend/internal/metricshandlers"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
@@ -60,7 +60,7 @@ func NewServer(logger zerolog.Logger, config *ServerConfig, clients *clients.Cli
 
 	metricsApiGroup := apiGroup.Group("/metrics")
 	metricsApiGroup.Use(server.authMiddleware(logger, auth.PermissionsDefault))
-	metricsapi.RegisterMetricsRoutes(metricsApiGroup, clients)
+	metricshandlers.RegisterMetricsRoutes(metricsApiGroup, clients)
 
 	return server
 }

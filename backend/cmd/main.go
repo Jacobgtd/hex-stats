@@ -11,6 +11,7 @@ import (
 	"github.com/Jacobgtd/hex-stats/backend/internal/db"
 	"github.com/Jacobgtd/hex-stats/backend/internal/github"
 	"github.com/Jacobgtd/hex-stats/backend/internal/monitoring"
+	"github.com/Jacobgtd/hex-stats/backend/internal/noaa"
 	"github.com/Jacobgtd/hex-stats/backend/internal/server"
 	"github.com/rs/zerolog"
 )
@@ -40,6 +41,13 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to load Alphavantage config")
 	}
 	avClient := alphavantage.NewAlphavantageClient(avConfig, httpClient)
+
+	// Initialize NOAAClient
+	noaaConfig, err := noaa.LoadNOAAClientConfig()
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to load NOAA client config")
+	}
+	noaaClient := noaa.NewNOAAClient(logger, noaaConfig, httpClient)
 
 	// Initialize GithubClient
 	ghConfig, err := github.LoadGithubClientConfig()
@@ -72,6 +80,7 @@ func main() {
 		AuthClient:         authClient,
 		DBClient:           dbClient,
 		AlphavantageClient: avClient,
+		NOAAClient:         noaaClient,
 	}
 
 	srv := server.NewServer(logger, config, clients)

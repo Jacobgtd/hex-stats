@@ -1,17 +1,13 @@
-package metricsapi
+package metricshandlers
 
 import (
 	"net/http"
 	"time"
 
 	"github.com/Jacobgtd/hex-stats/backend/internal/clients"
+	"github.com/Jacobgtd/hex-stats/backend/internal/metricsregistry"
 	"github.com/gin-gonic/gin"
 )
-
-func RegisterMetricsRoutes(rg *gin.RouterGroup, clients *clients.Clients) {
-	rg.GET("/stocks/:symbol/price", getStockPriceHandler(clients))
-	rg.GET("/stocks/:symbol/change-percent", getStockPercentChangeHandler(clients))
-}
 
 func getStockPriceHandler(clients *clients.Clients) func(*gin.Context) {
 	return func(c *gin.Context) {
@@ -23,12 +19,11 @@ func getStockPriceHandler(clients *clients.Clients) func(*gin.Context) {
 			return
 		}
 
-		resp := gaugeMetricResponse{
-			genericMetricResponse: genericMetricResponse{
+		resp := metricsregistry.GaugeMetricResponse{
+			GenericMetricResponse: metricsregistry.GenericMetricResponse{
 				RefreshAt: uint64(time.Now().Unix()),
 			},
-			Value:         price,
-			DisplayFormat: "currency",
+			Value: price,
 		}
 
 		c.JSON(http.StatusOK, resp)
@@ -46,12 +41,11 @@ func getStockPercentChangeHandler(clients *clients.Clients) func(*gin.Context) {
 			return
 		}
 
-		resp := gaugeMetricResponse{
-			genericMetricResponse: genericMetricResponse{
+		resp := metricsregistry.GaugeMetricResponse{
+			GenericMetricResponse: metricsregistry.GenericMetricResponse{
 				RefreshAt: uint64(time.Now().Unix()),
 			},
-			Value:         percentChange,
-			DisplayFormat: "percent",
+			Value: percentChange,
 		}
 
 		c.JSON(http.StatusOK, resp)

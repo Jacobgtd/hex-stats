@@ -40,6 +40,7 @@ func (g *GithubClient) IsAdmin(ctx context.Context, ghtoken string) (string, *co
 		WithBearerToken(ghtoken).
 		WithTimeout(5*time.Second).
 		WithPossibleResponseCodes(http.StatusOK, http.StatusUnauthorized, http.StatusForbidden).
+		WithCacheTTL(24 * time.Hour).
 		Do(ctx)
 
 	if err != nil {
@@ -53,6 +54,13 @@ func (g *GithubClient) IsAdmin(ctx context.Context, ghtoken string) (string, *co
 		return "", &common.StatusError{
 			Code:  http.StatusUnauthorized,
 			Error: fmt.Errorf("unauthorized"),
+		}
+	}
+
+	if err := resp.Unmarshal(&user); err != nil {
+		return "", &common.StatusError{
+			Code:  http.StatusUnauthorized,
+			Error: fmt.Errorf("failed to unmarshal user data"),
 		}
 	}
 

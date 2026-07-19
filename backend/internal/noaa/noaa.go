@@ -5,24 +5,23 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/Jacobgtd/hex-stats/backend/internal/monitoring"
 	"github.com/rs/zerolog"
 )
 
-const stationsPath = "/mdapi/prod/webapi/stations.json"
-const dataGetterPath = "/api/prod/datagetter"
+const stationsPath = "mdapi/prod/webapi/stations.json"
+const dataGetterPath = "api/prod/datagetter"
 
 type NOAAClient struct {
-	config     NOAAClientConfig
+	config     *NOAAClientConfig
 	logger     zerolog.Logger
-	httpClient monitoring.HTTPClient
+	httpClient *monitoring.HTTPClient
 }
 
-func NewNOAAClient(logger zerolog.Logger, config NOAAClientConfig, httpClient monitoring.HTTPClient) NOAAClient {
-	return NOAAClient{
+func NewNOAAClient(logger zerolog.Logger, config *NOAAClientConfig, httpClient *monitoring.HTTPClient) *NOAAClient {
+	return &NOAAClient{
 		config:     config,
 		logger:     logger,
 		httpClient: httpClient,
@@ -33,6 +32,7 @@ func (n *NOAAClient) GetStations(ctx context.Context) ([]Station, error) {
 
 	resp, err := n.httpClient.NewHTTPRequest(n.config.Url, stationsPath, http.MethodGet).
 		WithTimeout(5 * time.Second).
+		WithCacheTTL(24 * time.Hour).
 		Do(ctx)
 
 	if err != nil {
@@ -58,15 +58,7 @@ func validateDateOnly(t time.Time) error {
 	return nil
 }
 
-// Not working
-func (n *NOAAClient) GetTides(ctx context.Context, stationID int, begin, end time.Time) (interface{}, error) {
-
-	if err := validateDateOnly(begin); err != nil {
-		return nil, err
-	}
-	if err := validateDateOnly(end); err != nil {
-		return nil, err
-	}
+func (n *NOAAClient) getTides(ctx context.Context, stationID string, begin, end time.Time) (*TidePredictionsResponse, error) {
 
 	params := url.Values{}
 	params.Set("product", "predictions")
@@ -74,7 +66,7 @@ func (n *NOAAClient) GetTides(ctx context.Context, stationID int, begin, end tim
 	params.Set("begin_date", begin.Format("20060102"))
 	params.Set("end_date", end.Format("20060102"))
 	params.Set("datum", "MLLW")
-	params.Set("station", strconv.Itoa(stationID))
+	params.Set("station", stationID)
 	params.Set("time_zone", "gmt")
 	params.Set("units", "english")
 	params.Set("interval", "hilo")
@@ -83,17 +75,56 @@ func (n *NOAAClient) GetTides(ctx context.Context, stationID int, begin, end tim
 	resp, err := n.httpClient.NewHTTPRequest(n.config.Url, dataGetterPath, http.MethodGet).
 		WithQueryParams(params).
 		WithTimeout(5 * time.Second).
+		WithCacheTTL(24 * time.Hour).
 		Do(ctx)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var tideResp interface{}
+	var tideResp TidePredictionsResponse
 	err = resp.Unmarshal(&tideResp)
 	if err != nil {
 		return nil, err
 	}
 
-	return tideResp, nil
+	return &tideResp, nil
+}
+
+func (n *NOAAClient) getNearestTide(ctx context.Context, stationID string, tide TideType) (*TidePrediction, error) {
+
+	now := time.Now()
+
+	resp, err := n.getTides(ctx, stationID, now.Add(-24*time.Hour), now.Add(24*time.Hour))
+	if err != nil {
+		return nil, err
+	}
+
+	var nearestTide *TidePrediction
+	var nearestTideDuration time.Duration
+
+	for _, prediction := range resp.Predictions {
+
+		timeDiffTide := prediction.Time.Sub(now).Abs()
+
+		if prediction.Type == tide && (nearestTide == nil || timeDiffTide < nearestTideDuration) {
+			nearestTide = &prediction
+			nearestTideDuration = timeDiffTide
+
+		}
+	}
+
+	if nearestTide == nil {
+		return nil, fmt.Errorf("no %s tide found", tide)
+	}
+	return nearestTide, nil
+
+}
+
+func (n *NOAAClient) GetNearestHighTide(ctx context.Context, stationID string) (*TidePrediction, error) {
+	return n.getNearestTide(ctx, stationID, HighTide)
+}
+
+func (n *NOAAClient) GetNearestLowTide(ctx context.Context, stationID string) (*TidePrediction, error) {
+	return n.getNearestTide(ctx, stationID, LowTide)
 }
