@@ -2,3 +2,4 @@ dump/
 **/secrets/
 __debug*
 cache-dump
+*.exe

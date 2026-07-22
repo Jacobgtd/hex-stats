@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-hex-one-wire-poc",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "tests"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/hex-one-wire-poc"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}
